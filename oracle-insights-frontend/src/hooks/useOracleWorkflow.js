@@ -54,11 +54,19 @@ export const useOracleWorkflow = () => {
       return;
     }
 
+    // Detectar interrupciones
+    if (data.interrupt) {
+        setWaitingForUserInput(true);
+        setUserPrompt(data.interrupt);
+        setIsAnalyzing(false); // Permitir input del usuario
+        }
+
+
     const { step, agent, status, content, log, pdf_ready, pdf_url } = data;
 
     if (step) {
       setCurrentStep(step);
-      setAgentStatuses(prev => 
+      setAgentStatuses(prev =>
         prev.map(a => {
           if (a.id === step) {
             return { ...a, status: status || 'active', log: log || '' };
@@ -83,37 +91,53 @@ export const useOracleWorkflow = () => {
     if (pdf_ready && pdf_url) {
       setPdfUrl(pdf_url);
       setIsAnalyzing(false);
-      setAgentStatuses(prev => 
+      setAgentStatuses(prev =>
         prev.map(a => ({ ...a, status: 'completed', log: 'Completado' }))
       );
     }
   }, []);
 
-  const startAnalysis = useCallback(async (query) => {
-    setIsAnalyzing(true);
-    setError(null);
-    setMessages([]);
-    setPdfUrl(null);
-    setCurrentStep(0);
-    setAgentStatuses(AGENTS.map(agent => ({ ...agent, status: 'waiting', log: '' })));
+const startAnalysis = useCallback(async (query) => {
+  setIsAnalyzing(true);
+  setError(null);
+  setPdfUrl(null);
+  setCurrentStep(0);
+  setAgentStatuses(AGENTS.map(agent => ({ ...agent, status: 'waiting', log: '' })));
 
-    try {
-      const response = await createAnalysis(query);
-      const { thread_id } = response;
-      threadIdRef.current = thread_id;
-      connectWebSocket(thread_id);
-      
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        agent: 'system',
-        content: `Análisis iniciado. Thread ID: ${thread_id}`,
-        timestamp: new Date().toISOString(),
-      }]);
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Error al iniciar el análisis');
-      setIsAnalyzing(false);
+  // 👉 Guardar el mensaje del usuario en el historial
+  setMessages(prev => [
+    ...prev,
+    {
+      id: Date.now(),
+      agent: 'user',
+      content: query,
+      timestamp: new Date().toISOString(),
+    },
+    {
+      id: Date.now() + 1,
+      agent: 'system',
+      content: 'Iniciando análisis...',
+      timestamp: new Date().toISOString(),
     }
-  }, [connectWebSocket]);
+  ]);
+
+  try {
+    const response = await createAnalysis(query);
+    const { thread_id } = response;
+    threadIdRef.current = thread_id;
+    connectWebSocket(thread_id);
+
+    setMessages(prev => [...prev, {
+      id: Date.now() + 2,
+      agent: 'system',
+      content: `Análisis iniciado. Thread ID: ${thread_id}`,
+      timestamp: new Date().toISOString(),
+    }]);
+  } catch (err) {
+    setError(err.response?.data?.detail || 'Error al iniciar el análisis');
+    setIsAnalyzing(false);
+  }
+}, [connectWebSocket]);
 
   const resetWorkflow = useCallback(() => {
     if (wsRef.current) {
@@ -136,6 +160,16 @@ export const useOracleWorkflow = () => {
     };
   }, []);
 
+  const getAvailableModules = useCallback(async () => {
+  try {
+    const response = await api.get('/modules/available');
+    return response.data;
+  } catch (err) {
+    console.error('Error obteniendo módulos:', err);
+    return [];
+  }
+}, []);
+
   return {
     isAnalyzing,
     currentStep,
@@ -145,5 +179,6 @@ export const useOracleWorkflow = () => {
     error,
     startAnalysis,
     resetWorkflow,
+    getAvailableModules,
   };
 };

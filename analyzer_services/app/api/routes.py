@@ -1,4 +1,6 @@
 from fastapi import APIRouter, HTTPException,WebSocket,WebSocketDisconnect,Request
+from langchain_core.messages import HumanMessage
+
 from analyzer_services.app.models.schemas import AnalysisRequest
 from analyzer_services.app.process.Tasks_analyzer import run_oracle_analysis
 from analyzer_services.app.process.ConnectionManager import manager
@@ -6,6 +8,18 @@ import uuid
 import asyncio
 
 router = APIRouter(prefix="/impact", tags=["Impact"])
+
+@router.post("/respond/{thread_id}")
+async def respond_to_interrupt(thread_id: str, response: str, request: Request):
+    oracle_app = request.app.state.oracle_graph
+    config = {"configurable": {"thread_id": thread_id}}
+    inputs = {"messages": [HumanMessage(content=response)]}
+
+    # Reanudar el flujo asincrónicamente
+    asyncio.create_task(run_oracle_analysis(thread_id, response, oracle_app, resume=True))
+
+    return {"thread_id": thread_id, "status": "resumed"}
+
 
 @router.post("/analyze")
 async def start_analysis(request: AnalysisRequest,http_request: Request):

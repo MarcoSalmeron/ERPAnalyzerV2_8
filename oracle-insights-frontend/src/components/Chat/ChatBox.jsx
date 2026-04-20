@@ -10,18 +10,29 @@ const ChatBox = ({ messages, onSendMessage, isAnalyzing, onStartAnalysis }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+    const [waitingForInput, setWaitingForInput] = useState(false);
+    const [userPrompt, setUserPrompt] = useState('');
+
+    const handleSubmit = (e) => {
+      e.preventDefault();
+      if (!input.trim() || isAnalyzing) return;
+
+      const query = input.trim();
+      setInput('');
+
+      if (waitingForInput) {
+        // Enviar respuesta específica para el módulo
+        onSendUserResponse(query);
+        setWaitingForInput(false);
+        setUserPrompt('');
+      } else {
+        onStartAnalysis(query);
+      }
+    };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!input.trim() || isAnalyzing) return;
-    
-    const query = input.trim();
-    setInput('');
-    onStartAnalysis(query);
-  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {

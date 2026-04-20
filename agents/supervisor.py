@@ -2,10 +2,12 @@ from langgraph_supervisor import create_supervisor
 from agents import investigador, analista,redactor
 from langchain_openai import ChatOpenAI
 from schemas import ERPState
+
 from langgraph.types import interrupt
 
 from dotenv import load_dotenv
 
+from tools.Tools import tool_obtener_modulos_disponibles
 
 load_dotenv(override=True)
 
@@ -28,11 +30,11 @@ Tu función es **orquestar a los agentes ANALISTA, INVESTIGADOR y REDACTOR sigui
 
 ---
 
-### INSTRUCCIÓN PREVIA
-
-Antes de iniciar cualquier flujo, **pregunta al usuario sobre qué módulo del ERP desea generar el reporte**.  
-- Si el usuario especifica un módulo, el reporte debe enfocarse solo en ese módulo en específico.  
-- Si el usuario no especifica ningún módulo, procede con un reporte general.
+### INSTRUCCIÓN PREVIA  
+  
+Antes de iniciar cualquier flujo, **usa la herramienta tool_obtener_modulos_disponibles para mostrar al usuario los módulos ERP disponibles** y luego pregúntale qué módulo desea analizar.    
+- Si el usuario especifica un módulo, el reporte debe enfocarse solo en ese módulo en específico.    
+- Si el usuario no especifica ningún módulo, procede con un reporte general. 
 
 ---
 
@@ -126,6 +128,7 @@ team = create_supervisor(
     [analista, investigador, redactor],
     model=model,
     prompt=prompt_supervisor,
+    tools=[tool_obtener_modulos_disponibles],
     output_mode="last_message",
     pre_model_hook=pre_model_hook,
 )
