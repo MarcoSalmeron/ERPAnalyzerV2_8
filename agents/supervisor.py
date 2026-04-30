@@ -4,6 +4,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage
 from tools.Tools import tool_obtener_modulos_disponibles, tool_obtener_bots_disponibles
 from common.common_utl import detectar_ataque
+from langgraph.types import Command
+from langgraph.constants import END
+
 from dotenv import load_dotenv
 
 
@@ -12,22 +15,26 @@ load_dotenv(override=True)
 model = ChatOpenAI(model="gpt-4o", temperature=0)
 
 
-def security_pre_model_hook(state: dict) -> AIMessage:
+def security_pre_model_hook(state: dict):
+
     messages = state.get("messages", [])
     ultimo_human = next((m for m in reversed(messages) if isinstance(m, HumanMessage)), None)
 
     if ultimo_human:
-        print("DEBUG ultimo_human type:", type(ultimo_human))
-        print("DEBUG ultimo_human content repr:", repr(ultimo_human.content))
         es_ataque, motivo = detectar_ataque(ultimo_human.content)
         if es_ataque:
-            return AIMessage(
-                content=(
-                    "No puedo procesar esa solicitud. "
-                    "Este sistema está diseñado exclusivamente para analizar "
-                    "Oracle Cloud Readiness. Por favor, ingresa una versión y un módulo válido "
-                    "ej. 25A, 24D para continuar."
-                )
+            return Command(
+                update={
+                    "messages": [
+                        AIMessage(content=(
+                            f"No puedo procesar esa solicitud. Motivo: {motivo}"
+                            "Este sistema está diseñado exclusivamente para analizar "
+                            "Oracle Cloud Readiness. Por favor, ingresa una versión y un módulo válido "
+                            "ej. 25A, 24D para continuar."
+                        ))
+                    ]
+                },
+                goto=END
             )
 
     return state
